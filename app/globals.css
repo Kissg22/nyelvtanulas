@@ -104,3 +104,66 @@ h2 { letter-spacing: -.025em; }
 .translation-status { margin-left:auto; color:#667085; font-size:12px; background:#fff; border:1px solid var(--line); border-radius:999px; padding:5px 9px; }
 @media (max-width: 1000px) { .import-layout { grid-template-columns:1fr; } .import-preview-card { position:static; max-height:none; } }
 @media (max-width: 700px) { .sentence-translation { min-width:260px; max-width:88vw; } .translation-status { width:100%; margin-left:0; } }
+
+/* v0.3 reader shortcuts, text library and flashcards */
+.button.compact { padding: 8px 11px; font-size: 13px; }
+.reader-toolbar-v3 { padding: 10px 12px; background: rgba(255,255,255,.88); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 22px rgba(17,24,39,.04); }
+.reader-shortcuts { display:flex; flex-wrap:wrap; align-items:center; gap:7px; color:#475467; font-size:12px; }
+kbd { display:inline-grid; place-items:center; min-width:26px; height:24px; padding:0 6px; border:1px solid #d0d5dd; border-bottom-width:2px; border-radius:6px; background:#fff; color:#344054; font:700 11px/1 Inter,ui-sans-serif,system-ui,sans-serif; box-shadow:0 1px 1px rgba(16,24,40,.04); }
+.reader-card-v3 { padding: 28px 36px 44px; }
+.reader-title-row { display:flex; justify-content:space-between; gap:24px; align-items:flex-start; max-width:920px; margin:0 auto 28px; padding-bottom:20px; border-bottom:1px solid var(--line); font-family:Inter,ui-sans-serif,system-ui,sans-serif; }
+.reader-title-row h2 { margin:3px 0 0; font-size:23px; }
+.reader-kicker { color:#6366f1; font-size:11px; font-weight:900; letter-spacing:.13em; }
+.reader-help { max-width:420px; color:#667085; font-size:13px; line-height:1.5; text-align:right; }
+.sentence { cursor:default; }
+.sentence.active { background:#eef2ff; box-shadow:0 0 0 1px #c7d2fe, 0 4px 12px rgba(79,70,229,.06); }
+.sentence-translation { padding:12px 14px 11px; border-color:#c7d2fe; box-shadow:0 18px 45px rgba(17,24,39,.18); }
+.translation-label { display:block; margin-bottom:5px; color:#6366f1; font-family:Inter,ui-sans-serif,system-ui,sans-serif; font-size:9px; line-height:1; font-weight:900; letter-spacing:.14em; }
+.translation-label.dark { color:#a5b4fc; }
+.translation-key-hint { display:block; margin-top:6px; color:#98a2b3; font-family:Inter,ui-sans-serif,system-ui,sans-serif; font-size:10px; }
+.word-popup-v3 { text-align:left; min-width:205px; }
+.word-popup-v3 b { font-size:15px; }
+.word-popup-v3 small { padding-top:4px; border-top:1px solid rgba(255,255,255,.12); margin-top:2px; }
+
+.text-library-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.text-library-card { display:flex; flex-direction:column; min-height:245px; padding:20px; background:#fff; border:1px solid var(--line); border-radius:18px; box-shadow:0 8px 28px rgba(17,24,39,.045); transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease; }
+.text-library-card:hover { transform:translateY(-2px); border-color:#c7d2fe; box-shadow:0 15px 36px rgba(17,24,39,.08); }
+.text-library-card-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.text-library-card h2 { margin:17px 0 9px; font-size:20px; }
+.text-date { font-size:12px; }
+.text-preview { margin:0; color:#667085; line-height:1.65; font-family:ui-serif,Georgia,Cambria,"Times New Roman",serif; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.text-library-footer { display:flex; justify-content:space-between; gap:14px; align-items:center; margin-top:auto; padding-top:18px; }
+.text-library-actions { display:flex; gap:8px; }
+
+.practice-mode-switch { width:max-content; display:flex; gap:4px; padding:4px; margin:0 auto 16px; background:#e9edf5; border-radius:12px; }
+.practice-mode-switch button { border:0; border-radius:9px; padding:9px 16px; background:transparent; color:#667085; font-weight:750; }
+.practice-mode-switch button.active { background:#fff; color:#312e81; box-shadow:0 2px 8px rgba(17,24,39,.08); }
+.flashcard-shell { max-width:760px; margin:0 auto; padding:22px; background:#fff; border:1px solid var(--line); border-radius:20px; box-shadow:var(--shadow); }
+.flashcard-topline { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; color:#667085; font-size:13px; }
+.text-button { border:0; background:transparent; color:#4f46e5; font-weight:750; padding:5px 7px; }
+.flashcard { position:relative; display:block; width:100%; height:360px; margin:22px 0 18px; padding:0; border:0; background:transparent; perspective:1200px; color:inherit; }
+.flashcard-side { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:42px; border:1px solid #dfe4ee; border-radius:22px; background:linear-gradient(145deg,#fff,#f8f9ff); box-shadow:0 18px 45px rgba(17,24,39,.08); backface-visibility:hidden; transition:transform .42s cubic-bezier(.2,.75,.25,1),box-shadow .2s ease; }
+.flashcard:hover .flashcard-side { box-shadow:0 23px 55px rgba(17,24,39,.12); }
+.flashcard-back { transform:rotateY(180deg); background:linear-gradient(145deg,#171a34,#27264d); color:#fff; border-color:#343361; }
+.flashcard.is-flipped .flashcard-front { transform:rotateY(180deg); }
+.flashcard.is-flipped .flashcard-back { transform:rotateY(360deg); }
+.flashcard-eyebrow { font-size:11px; font-weight:900; letter-spacing:.16em; color:#6366f1; }
+.flashcard-back .flashcard-eyebrow { color:#a5b4fc; }
+.flashcard-side strong { max-width:90%; font-size:clamp(30px,5vw,48px); line-height:1.1; letter-spacing:-.035em; }
+.flashcard-side small { color:#98a2b3; }
+.flashcard-example { max-width:580px; color:#d0d5dd; font-family:ui-serif,Georgia,serif; font-size:16px; font-style:italic; line-height:1.5; }
+.flashcard-actions { display:grid; grid-template-columns:1fr auto 1fr; gap:10px; }
+.flashcard-actions .button:last-child { justify-self:stretch; }
+.flashcard-keyboard { margin-top:16px; text-align:center; font-size:12px; }
+.flashcard-keyboard kbd { margin:0 3px; }
+
+@media (max-width: 800px) {
+  .text-library-grid { grid-template-columns:1fr; }
+  .reader-title-row { display:block; }
+  .reader-help { margin-top:10px; max-width:none; text-align:left; }
+  .reader-card-v3 { padding:22px 18px 34px; }
+  .flashcard { height:320px; }
+  .flashcard-side { padding:28px 20px; }
+  .flashcard-actions { grid-template-columns:1fr 1fr; }
+  .flashcard-actions .button:nth-child(2) { order:3; grid-column:1 / -1; }
+}

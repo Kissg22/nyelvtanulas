@@ -10,6 +10,7 @@ export default async function Texts(){
   const items=rows.map(row=>({
     id:String(row.id),title:String(row.title),source_language:row.source_language as 'en'|'de',created_at:String(row.created_at),
     sentence_count:segmentSentences(String(row.original_text),row.source_language as 'en'|'de').length,
+    preview:String(row.original_text).replace(/\s+/g,' ').trim().slice(0,210)+(String(row.original_text).length>210?'…':''),
   })) as TextItem[];
   return <><div className="page-head"><div><h1>Szövegeim</h1><div className="muted">A saját olvasási anyagaid.</div></div><Link className="button" href="/import">+ Új szöveg</Link></div><TextList items={items}/></>;
 }

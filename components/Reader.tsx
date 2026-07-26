@@ -14,9 +14,9 @@ export default function Reader({text}:Props){
   const [preferences,setPreferences]=useState<ReaderPreferences>(DEFAULT_PREFERENCES);
   const [sentenceTranslations,setSentenceTranslations]=useState<Record<string,string>>({});
   const sentenceTranslationsRef=useRef<Record<string,string>>({});
-  const [wordTranslations,setWordTranslations]=useState<Record<string,string>>({});
   const wordTranslationsRef=useRef<Record<string,string>>({});
   const [activeSentence,setActiveSentence]=useState<string|null>(null);
+  const [hoveredSentence,setHoveredSentence]=useState<Sentence|null>(null);
   const [hoveredWord,setHoveredWord]=useState<WordTarget|null>(null);
   const [wordPopup,setWordPopup]=useState<WordPopup|null>(null);
   const [saved,setSaved]=useState<Set<string>>(new Set());
@@ -38,7 +38,8 @@ export default function Reader({text}:Props){
   useEffect(()=>{
     setPreferences(loadPreferences());
     const load=()=>{voices.current=window.speechSynthesis.getVoices()};
-    load(); window.speechSynthesis.addEventListener('voiceschanged',load);
+    load();
+    window.speechSynthesis.addEventListener('voiceschanged',load);
     fetch(`/api/words?lang=${text.source_language}`)
       .then(r=>r.json())
       .then(d=>setSaved(new Set((d.words||[]).map((w:{word_normalized:string})=>w.word_normalized))))
@@ -46,6 +47,7 @@ export default function Reader({text}:Props){
     return()=>{
       window.speechSynthesis.removeEventListener('voiceschanged',load);
       window.speechSynthesis.cancel();
+      if(sentenceTimer.current)clearTimeout(sentenceTimer.current);
     };
   },[text.source_language]);
 
@@ -63,19 +65,16 @@ export default function Reader({text}:Props){
   },[preferences,text.source_language]);
 
   const getTranslation=useCallback(async(sourceText:string,type:'word'|'sentence',context='')=>{
-    const wordKey=`${normalizeWord(sourceText)}|${context}`;
-    if(type==='word'&&wordTranslationsRef.current[wordKey])return wordTranslationsRef.current[wordKey];
+    const localKey=type==='word'?`${normalizeWord(sourceText)}|${context}`:sourceText;
+    if(type==='word'&&wordTranslationsRef.current[localKey])return wordTranslationsRef.current[localKey];
 
     const cachedRes=await fetch('/api/translate',{
       method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({sourceLanguage:text.source_language,type,sourceText,context}),
     });
-    const cached=await cachedRes.json();
+    const cached=await cachedRes.json().catch(()=>({}));
     if(cachedRes.ok&&cached.translation){
-      if(type==='word'){
-        wordTranslationsRef.current={...wordTranslationsRef.current,[wordKey]:cached.translation};
-        setWordTranslations(wordTranslationsRef.current);
-      }
+      if(type==='word')wordTranslationsRef.current={...wordTranslationsRef.current,[localKey]:String(cached.translation)};
       return String(cached.translation);
     }
 
@@ -86,7 +85,7 @@ export default function Reader({text}:Props){
       });
     }catch(error){
       if((error as Error).message==='BROWSER_TRANSLATOR_UNAVAILABLE'){
-        setTranslationStatus('A helyi automatikus fordításhoz Chrome 138+ asztali böngésző szükséges.');
+        setTranslationStatus('A helyi automatikus fordítás ezen a böngészőn nem érhető el.');
       }else{
         setTranslationStatus('A helyi fordítás most nem érhető el.');
       }
@@ -94,10 +93,7 @@ export default function Reader({text}:Props){
     }
 
     if(!translated)return '';
-    if(type==='word'){
-      wordTranslationsRef.current={...wordTranslationsRef.current,[wordKey]:translated};
-      setWordTranslations(wordTranslationsRef.current);
-    }
+    if(type==='word')wordTranslationsRef.current={...wordTranslationsRef.current,[localKey]:translated};
 
     void fetch('/api/translate',{
       method:'POST',headers:{'content-type':'application/json'},
@@ -106,19 +102,26 @@ export default function Reader({text}:Props){
     return translated;
   },[text.source_language]);
 
-  // Automatically prepare all sentence translations in the background.
+  const ensureSentenceTranslation=useCallback(async(sentence:Sentence)=>{
+    if(sentenceTranslationsRef.current[sentence.id])return sentenceTranslationsRef.current[sentence.id];
+    const tr=await getTranslation(sentence.source_text,'sentence');
+    if(tr){
+      sentenceTranslationsRef.current={...sentenceTranslationsRef.current,[sentence.id]:tr};
+      setSentenceTranslations(sentenceTranslationsRef.current);
+    }
+    return tr;
+  },[getTranslation]);
+
+  // Prepare the text automatically, but keep interaction instant from the cache afterwards.
   useEffect(()=>{
     let cancelled=false;
     async function prepare(){
       let done=0;
       for(const sentence of allSentences){
         if(cancelled)return;
-        if(sentenceTranslationsRef.current[sentence.id])continue;
-        setTranslationStatus(`Automatikus fordítás: ${done}/${allSentences.length}`);
-        const tr=await getTranslation(sentence.source_text,'sentence');
-        if(tr&&!cancelled){
-          sentenceTranslationsRef.current={...sentenceTranslationsRef.current,[sentence.id]:tr};
-          setSentenceTranslations(sentenceTranslationsRef.current);
+        if(!sentenceTranslationsRef.current[sentence.id]){
+          setTranslationStatus(`Automatikus fordítás: ${done}/${allSentences.length}`);
+          await ensureSentenceTranslation(sentence);
         }
         done+=1;
       }
@@ -126,34 +129,29 @@ export default function Reader({text}:Props){
     }
     void prepare();
     return()=>{cancelled=true};
-  },[allSentences,getTranslation]);
+  },[allSentences,ensureSentenceTranslation]);
 
   function enterSentence(sentence:Sentence){
+    setHoveredSentence(sentence);
     if(sentenceTimer.current)clearTimeout(sentenceTimer.current);
-    sentenceTimer.current=setTimeout(async()=>{
+    sentenceTimer.current=setTimeout(()=>{
       if(wordPopup)return;
       setActiveSentence(sentence.id);
-      if(preferences.auto_sentence_audio)speak(sentence.source_text);
-      if(preferences.show_translation&&!sentenceTranslationsRef.current[sentence.id]){
-        const tr=await getTranslation(sentence.source_text,'sentence');
-        if(tr){
-          sentenceTranslationsRef.current={...sentenceTranslationsRef.current,[sentence.id]:tr};
-          setSentenceTranslations(sentenceTranslationsRef.current);
-        }
-      }
-    },320);
+      void ensureSentenceTranslation(sentence);
+    },180);
   }
 
-  function leaveSentence(){
+  function leaveSentence(sentence:Sentence){
     if(sentenceTimer.current)clearTimeout(sentenceTimer.current);
-    setActiveSentence(null);
+    setHoveredSentence(current=>current?.id===sentence.id?null:current);
+    setActiveSentence(current=>current===sentence.id?null:current);
   }
 
-  async function openWord(word:string,sentence:Sentence){
+  async function openWord(word:string,sentence:Sentence,playAudio=true){
     if(sentenceTimer.current)clearTimeout(sentenceTimer.current);
     setActiveSentence(null);
     setWordPopup({word,sentence,translation:'',loading:true});
-    speak(word);
+    if(playAudio)speak(word);
     const key=`${normalizeWord(word)}|${sentence.source_text}`;
     const existing=wordTranslationsRef.current[key];
     const translation=existing||await getTranslation(word,'word',sentence.source_text);
@@ -183,40 +181,77 @@ export default function Reader({text}:Props){
     setTimeout(()=>setNotice(''),2200);
   },[getTranslation,text.id,text.source_language]);
 
+  const playHoveredSentence=useCallback(async()=>{
+    if(!hoveredSentence)return;
+    setWordPopup(null);
+    setActiveSentence(hoveredSentence.id);
+    await ensureSentenceTranslation(hoveredSentence);
+    speak(hoveredSentence.source_text);
+  },[ensureSentenceTranslation,hoveredSentence,speak]);
+
+  const playHoveredWord=useCallback(async()=>{
+    if(!hoveredWord)return;
+    await openWord(hoveredWord.word,hoveredWord.sentence,true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[hoveredWord,speak,getTranslation]);
+
   useEffect(()=>{
     function key(e:KeyboardEvent){
       const target=e.target as HTMLElement|null;
       const typing=target?.tagName==='INPUT'||target?.tagName==='TEXTAREA'||target?.isContentEditable;
-      if(!typing&&hoveredWord&&e.key.toLowerCase()==='s'){
+      if(typing)return;
+      const pressed=e.key.toLowerCase();
+      if(pressed==='s'&&hoveredWord){
         e.preventDefault();
         void saveWord(hoveredWord);
+      }else if(pressed==='w'&&hoveredSentence){
+        e.preventDefault();
+        void playHoveredSentence();
+      }else if(pressed==='e'&&hoveredWord){
+        e.preventDefault();
+        void playHoveredWord();
+      }else if(e.key==='Escape'){
+        setWordPopup(null);
+        window.speechSynthesis.cancel();
       }
-      if(e.key==='Escape')setWordPopup(null);
     }
     window.addEventListener('keydown',key);
     return()=>window.removeEventListener('keydown',key);
-  },[hoveredWord,saveWord]);
+  },[hoveredSentence,hoveredWord,playHoveredSentence,playHoveredWord,saveWord]);
 
   return <>
-    <div className="reader-toolbar">
+    <div className="reader-toolbar reader-toolbar-v3">
       <span className="tag">{text.source_language==='en'?'ANGOL → MAGYAR':'NÉMET → MAGYAR'}</span>
-      <button className="button secondary" onClick={()=>window.speechSynthesis.cancel()}>■ Hang leállítása</button>
-      <span className="muted"><b>Mondat:</b> rámutatás · <b>Szó:</b> dupla kattintás · <b>S:</b> szó mentése</span>
+      <div className="reader-shortcuts">
+        <span><kbd>W</kbd> mondat + jelentés</span>
+        <span><kbd>E</kbd> szó + jelentés</span>
+        <span><kbd>S</kbd> szó mentése</span>
+      </div>
+      <button className="button secondary compact" onClick={()=>window.speechSynthesis.cancel()}>■ Leállítás</button>
       <span className="translation-status">{translationStatus}</span>
     </div>
     {notice&&<div className={notice.startsWith('Elmentve')?'success':'error'} style={{marginBottom:12}}>{notice}</div>}
 
-    <article className="reader-card" onClick={()=>setWordPopup(null)}>
+    <article className="reader-card reader-card-v3" onClick={()=>setWordPopup(null)}>
+      <div className="reader-title-row">
+        <div>
+          <div className="reader-kicker">OLVASÁS</div>
+          <h2>{text.title}</h2>
+        </div>
+        <div className="reader-help">Vidd az egeret egy mondatra vagy szóra, majd használd a W / E / S gombokat.</div>
+      </div>
       <div className="reader-text" style={{fontSize:preferences.font_size,lineHeight:preferences.line_height}}>
         {paragraphs.map(paragraph=><p className="reader-paragraph" key={paragraph.id}>
           {paragraph.sentences.map(sentence=><span
             key={sentence.id}
             className={`sentence ${activeSentence===sentence.id?'active':''}`}
             onMouseEnter={()=>enterSentence(sentence)}
-            onMouseLeave={leaveSentence}
+            onMouseLeave={()=>leaveSentence(sentence)}
           >
-            {activeSentence===sentence.id&&preferences.show_translation&&!wordPopup&&<span className="sentence-translation">
+            {activeSentence===sentence.id&&!wordPopup&&<span className="sentence-translation">
+              <span className="translation-label">MAGYARUL</span>
               {sentenceTranslations[sentence.id]||'Fordítás folyamatban…'}
+              <span className="translation-key-hint">W · felolvasás</span>
             </span>}
             {tokenizeSentence(sentence.source_text).map((token,i)=>isWordToken(token)?<span
               key={`${sentence.id}-${i}`}
@@ -224,14 +259,14 @@ export default function Reader({text}:Props){
               onMouseEnter={()=>setHoveredWord({word:token,sentence})}
               onMouseLeave={()=>setHoveredWord(current=>current?.word===token&&current.sentence.id===sentence.id?null:current)}
               onClick={e=>e.stopPropagation()}
-              onDoubleClick={e=>{e.preventDefault();e.stopPropagation();void openWord(token,sentence)}}
-              title="Dupla kattintás: jelentés és kiejtés · S: mentés"
+              onDoubleClick={e=>{e.preventDefault();e.stopPropagation();void openWord(token,sentence,true)}}
+              title="E: szó kiejtése és jelentése · S: mentés · dupla kattintás: ugyanaz, mint E"
             >
               {token}
-              {wordPopup?.word===token&&wordPopup.sentence.id===sentence.id&&<span className="word-popup" onClick={e=>e.stopPropagation()}>
-                <b>{token}</b>
-                <span>{wordPopup.loading?'Fordítás…':wordPopup.translation||'Nincs fordítás.'}</span>
-                <small>🔊 Kiejtés lejátszva</small>
+              {wordPopup?.word===token&&wordPopup.sentence.id===sentence.id&&<span className="word-popup word-popup-v3" onClick={e=>e.stopPropagation()}>
+                <span className="translation-label dark">MAGYARUL</span>
+                <b>{wordPopup.loading?'Fordítás…':wordPopup.translation||'Nincs fordítás.'}</b>
+                <small>{token} · 🔊 kiejtés</small>
               </span>}
             </span>:<span key={`${sentence.id}-${i}`}>{token}</span>)}{' '}
           </span>)}
