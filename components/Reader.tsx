@@ -260,8 +260,6 @@ export default function Reader({text}:Props){
               onMouseLeave={()=>setHoveredWord(current=>current?.word===token&&current.sentence.id===sentence.id?null:current)}
               onClick={e=>e.stopPropagation()}
               onDoubleClick={e=>{e.preventDefault();e.stopPropagation();void openWord(token,sentence,true)}}
-              title="E: szó kiejtése és jelentése · S: mentés · dupla kattintás: ugyanaz, mint E"
-            >
               {token}
               {wordPopup?.word===token&&wordPopup.sentence.id===sentence.id&&<span className="word-popup word-popup-v3" onClick={e=>e.stopPropagation()}>
                 <span className="translation-label dark">MAGYARUL</span>
