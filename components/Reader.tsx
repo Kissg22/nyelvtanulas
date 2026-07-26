@@ -18,6 +18,8 @@ export default function Reader({text}:Props){
   const [activeSentence,setActiveSentence]=useState<string|null>(null);
   const [hoveredSentence,setHoveredSentence]=useState<Sentence|null>(null);
   const [hoveredWord,setHoveredWord]=useState<WordTarget|null>(null);
+  const [selectedSentence,setSelectedSentence]=useState<Sentence|null>(null);
+  const [selectedWord,setSelectedWord]=useState<WordTarget|null>(null);
   const [wordPopup,setWordPopup]=useState<WordPopup|null>(null);
   const [saved,setSaved]=useState<Set<string>>(new Set());
   const [notice,setNotice]=useState('');
@@ -195,6 +197,25 @@ export default function Reader({text}:Props){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[hoveredWord,speak,getTranslation]);
 
+  const playSelectedSentence=useCallback(async()=>{
+    if(!selectedSentence)return;
+    setWordPopup(null);
+    setActiveSentence(selectedSentence.id);
+    await ensureSentenceTranslation(selectedSentence);
+    speak(selectedSentence.source_text);
+  },[selectedSentence,ensureSentenceTranslation,speak]);
+
+  const playSelectedWord=useCallback(async()=>{
+    if(!selectedWord)return;
+    await openWord(selectedWord.word,selectedWord.sentence,true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[selectedWord,speak,getTranslation]);
+
+  const saveSelectedWord=useCallback(async()=>{
+    if(!selectedWord)return;
+    await saveWord(selectedWord);
+  },[selectedWord,saveWord]);
+
   useEffect(()=>{
     function key(e:KeyboardEvent){
       const target=e.target as HTMLElement|null;
@@ -247,6 +268,12 @@ export default function Reader({text}:Props){
             className={`sentence ${activeSentence===sentence.id?'active':''}`}
             onMouseEnter={()=>enterSentence(sentence)}
             onMouseLeave={()=>leaveSentence(sentence)}
+            onClick={()=>{
+              setSelectedSentence(sentence);
+              setHoveredSentence(sentence);
+              setActiveSentence(sentence.id);
+              void ensureSentenceTranslation(sentence);
+            }}
           >
             {activeSentence===sentence.id&&!wordPopup&&<span className="sentence-translation">
               <span className="translation-label">MAGYARUL</span>
@@ -258,9 +285,17 @@ export default function Reader({text}:Props){
               className={`word ${saved.has(normalizeWord(token))?'saved':''}`}
               onMouseEnter={()=>setHoveredWord({word:token,sentence})}
               onMouseLeave={()=>setHoveredWord(current=>current?.word===token&&current.sentence.id===sentence.id?null:current)}
-              onClick={e=>e.stopPropagation()}
+              onClick={e=>{
+                e.preventDefault();
+                e.stopPropagation();
+                const target={word:token,sentence};
+                setSelectedWord(target);
+                setSelectedSentence(sentence);
+                setHoveredWord(target);
+                setHoveredSentence(sentence);
+                void openWord(token,sentence,false);
+              }}
               onDoubleClick={e=>{e.preventDefault();e.stopPropagation();void openWord(token,sentence,true)}}
-              title="E: szó kiejtése és jelentése · S: mentés · dupla kattintás: ugyanaz, mint E"
             >
               {token}
               {wordPopup?.word===token&&wordPopup.sentence.id===sentence.id&&<span className="word-popup word-popup-v3" onClick={e=>e.stopPropagation()}>
@@ -273,5 +308,37 @@ export default function Reader({text}:Props){
         </p>)}
       </div>
     </article>
+
+    {(selectedSentence||selectedWord)&&<div className="mobile-reader-controls">
+      <button
+        type="button"
+        className="mobile-reader-button"
+        disabled={!selectedSentence}
+        onClick={()=>{void playSelectedSentence()}}
+      >
+        <span className="mobile-reader-icon">🔊</span>
+        <span>Mondat</span>
+      </button>
+
+      <button
+        type="button"
+        className="mobile-reader-button primary"
+        disabled={!selectedWord}
+        onClick={()=>{void playSelectedWord()}}
+      >
+        <span className="mobile-reader-icon">🔊</span>
+        <span>Szó</span>
+      </button>
+
+      <button
+        type="button"
+        className="mobile-reader-button"
+        disabled={!selectedWord||Boolean(selectedWord&&saved.has(normalizeWord(selectedWord.word)))}
+        onClick={()=>{void saveSelectedWord()}}
+      >
+        <span className="mobile-reader-icon">{selectedWord&&saved.has(normalizeWord(selectedWord.word))?'✓':'★'}</span>
+        <span>{selectedWord&&saved.has(normalizeWord(selectedWord.word))?'Mentve':'Mentés'}</span>
+      </button>
+    </div>}
   </>;
 }
