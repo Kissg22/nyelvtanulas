@@ -8,7 +8,6 @@ export async function GET(request: Request) {
   try {
     const user = await requireUser();
     const url = new URL(request.url);
-    const status = url.searchParams.get('status');
     const lang = url.searchParams.get('lang');
     const search = url.searchParams.get('q')?.trim() ?? '';
 
@@ -17,10 +16,11 @@ export async function GET(request: Request) {
       FROM user_words uw
       LEFT JOIN texts t ON t.id = uw.source_text_id
       WHERE uw.user_id = ${user.id}
-        AND (${status || null}::text IS NULL OR uw.status = ${status || null})
         AND (${lang || null}::text IS NULL OR uw.source_language = ${lang || null})
-        AND (${search || null}::text IS NULL OR uw.display_word ILIKE ${search ? `%${search}%` : null} OR uw.hungarian_meaning ILIKE ${search ? `%${search}%` : null})
-      ORDER BY (uw.status = 'learning') DESC, uw.next_review_at ASC, uw.created_at DESC
+        AND (${search || null}::text IS NULL
+          OR uw.display_word ILIKE ${search ? `%${search}%` : null}
+          OR uw.hungarian_meaning ILIKE ${search ? `%${search}%` : null})
+      ORDER BY uw.created_at DESC
     `;
     return NextResponse.json({ words: rows });
   } catch (error) {
@@ -42,40 +42,19 @@ export async function POST(request: Request) {
     const rows = await sql`
       INSERT INTO user_words (
         user_id, source_language, word_normalized, display_word, hungarian_meaning,
-        source_text_id, source_sentence_id, example_sentence, example_translation
+        source_text_id, example_sentence
       ) VALUES (
         ${user.id}, ${sourceLanguage}, ${normalized}, ${displayWord}, ${meaning},
-        ${b.sourceTextId || null}, ${b.sourceSentenceId || null},
-        ${b.exampleSentence || null}, ${b.exampleTranslation || null}
+        ${b.sourceTextId || null}, ${b.exampleSentence || null}
       )
       ON CONFLICT (user_id, source_language, word_normalized)
       DO UPDATE SET
         hungarian_meaning = EXCLUDED.hungarian_meaning,
-        example_sentence = COALESCE(user_words.example_sentence, EXCLUDED.example_sentence),
-        example_translation = COALESCE(user_words.example_translation, EXCLUDED.example_translation),
-        updated_at = now()
+        source_text_id = COALESCE(user_words.source_text_id, EXCLUDED.source_text_id),
+        example_sentence = COALESCE(user_words.example_sentence, EXCLUDED.example_sentence)
       RETURNING *
     `;
     return NextResponse.json({ word: rows[0] });
-  } catch (error) {
-    if ((error as Error).message === 'UNAUTHORIZED') return unauthorized();
-    return serverError(error);
-  }
-}
-
-export async function PATCH(request: Request) {
-  try {
-    const user = await requireUser();
-    const b = await request.json();
-    const id = String(b.id ?? '');
-    const status = b.status === 'known' ? 'known' : b.status === 'learning' ? 'learning' : null;
-    if (!id || !status) return badRequest('Hiányos módosítás.');
-    const rows = await sql`
-      UPDATE user_words SET status = ${status}, updated_at = now()
-      WHERE id = ${id} AND user_id = ${user.id}
-      RETURNING *
-    `;
-    return NextResponse.json({ word: rows[0] ?? null });
   } catch (error) {
     if ((error as Error).message === 'UNAUTHORIZED') return unauthorized();
     return serverError(error);

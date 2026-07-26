@@ -23,7 +23,6 @@ export async function POST(request: Request) {
     `;
     const user = rows[0] as { id: string; email: string; display_name: string };
 
-    await sql`INSERT INTO user_settings (user_id) VALUES (${user.id}) ON CONFLICT DO NOTHING`;
     await createSession(user.id);
 
     return NextResponse.json({ user });

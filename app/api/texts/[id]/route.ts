@@ -8,15 +8,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const user = await requireUser();
     const { id } = await params;
     const texts = await sql`
-      SELECT id, title, source_language, target_language, original_text, created_at
+      SELECT id, title, source_language, original_text, created_at
       FROM texts WHERE id = ${id} AND user_id = ${user.id} LIMIT 1
     `;
     if (!texts.length) return NextResponse.json({ error: 'A szöveg nem található.' }, { status: 404 });
-    const sentences = await sql`
-      SELECT id, position, source_text, translated_text
-      FROM sentences WHERE text_id = ${id} ORDER BY position ASC
-    `;
-    return NextResponse.json({ text: texts[0], sentences });
+    return NextResponse.json({ text: texts[0] });
   } catch (error) {
     if ((error as Error).message === 'UNAUTHORIZED') return unauthorized();
     return serverError(error);

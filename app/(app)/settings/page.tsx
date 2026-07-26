@@ -1,2 +1,2 @@
-import {requireUser} from '@/lib/auth';import{sql}from'@/lib/db';import SettingsForm from '@/components/SettingsForm';
-export default async function Settings(){const u=await requireUser();let r=await sql`SELECT * FROM user_settings WHERE user_id=${u.id} LIMIT 1`;if(!r.length){r=await sql`INSERT INTO user_settings(user_id) VALUES(${u.id}) RETURNING *`;}return <><div className="page-head"><div><h1>Beállítások</h1><div className="muted">Hang, automatikus felolvasás és olvasási megjelenés.</div></div></div><SettingsForm initial={r[0] as any}/></>}
+import SettingsForm from '@/components/SettingsForm';
+export default function Settings(){return <><div className="page-head"><div><h1>Beállítások</h1><div className="muted">Hang és olvasási megjelenés. Ezek az adatok csak a böngésződben tárolódnak.</div></div></div><SettingsForm/></>}

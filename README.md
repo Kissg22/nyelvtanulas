@@ -1,61 +1,38 @@
-# LinguaHover — Vercel verzió
+# LinguaHover
 
-Saját szövegekre épülő angol–magyar és német–magyar nyelvtanuló webalkalmazás.
+Next.js + Neon PostgreSQL nyelvtanuló alkalmazás angol→magyar és német→magyar tanuláshoz.
 
-## Funkciók
+## Környezeti változó
 
-- Felhasználói regisztráció és bejelentkezés saját, HttpOnly session cookie-val.
-- Felhasználónként elkülönített PostgreSQL adatok.
-- Hosszú szöveg importálása beillesztéssel vagy `.txt` / `.md` fájlból.
-- Automatikus mondatbontás.
-- Mondat hover: idegen nyelvű felolvasás + magyar fordítás.
-- Szó hover: magyar jelentés + kiejtés.
-- `S` gyorsbillentyű: az aktuális szó mentése az ismeretlen szavakhoz.
-- Több böngészőben elérhető angol és német TTS-hang kiválasztása.
-- Saját szótár, known/learning státusz, keresés, szűrés.
-- 4 gyakorlási mód: idegen→magyar, magyar→idegen, hallás utáni gépelés, mondatkiegészítés.
-- Egyszerű spaced repetition és review history.
-- Fordítási cache PostgreSQL-ben.
-- Vercel AI Gateway alapú szerveroldali fordítás.
-
-## 1. Vercel projekt
-
-Tedd a repót GitHubra, majd importáld a Vercelbe.
-
-## 2. PostgreSQL
-
-A Vercel Dashboardban:
-
-`Project -> Storage / Marketplace -> Neon -> Add to project`
-
-A Neon integráció automatikusan létrehozza a `DATABASE_URL` környezeti változót.
-
-Ezután futtasd a `db/schema.sql` teljes tartalmát a Vercel adatbázis Query felületén.
-
-## 3. Környezeti változók
-
-A Vercel Project Settings -> Environment Variables alatt:
+Csak egy kötelező szerveroldali változó van:
 
 ```env
-DATABASE_URL=...
-AI_GATEWAY_API_KEY=...
-AI_TRANSLATION_MODEL=openai/gpt-5.6-luna
+DATABASE_URL="postgresql://..."
 ```
 
-## 4. AI Gateway
+## Adatbázis
 
-Kapcsold be a Vercel AI Gateway-t a projektben, majd add meg az API-kulcsát. A fordítás csak a szerveren történik; kulcs nem kerül a böngészőbe.
+Új adatbázisnál futtasd a `db/schema.sql` fájlt.
 
-## 5. Helyi futtatás
+Ha a korábbi LinguaHover-sémáról frissítesz, először futtasd a `db/migrate-simplified.sql` fájlt. Ez eltávolítja a `sentences`, `user_settings` és `review_events` táblákat, valamint a felesleges SRS mezőket.
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
+Az új séma 5 táblát használ:
 
-Nyisd meg: `http://localhost:3000`
+- `users`
+- `sessions`
+- `texts`
+- `user_words`
+- `translations`
 
-## Megjegyzés a hangokról
+## Fordítás és hang
 
-A TTS a böngésző `speechSynthesis` API-ját használja, ezért az elérhető hangok operációs rendszer és böngésző szerint eltérnek. A Beállítások oldalon az app automatikusan kilistázza az `en-*` és `de-*` hangokat.
+A mondat- és szófordítás Chrome 138+ asztali böngészőben a beépített Translator API-val helyben történik. A kész fordításokat az alkalmazás a `translations` táblában cache-eli.
+
+A kiejtés a böngésző Web Speech (`speechSynthesis`) funkcióját használja; nincs TTS API-kulcs.
+
+## Reader vezérlés
+
+- mondat fölé húzás: felolvasás + magyar fordítás a mondat fölött
+- szó dupla kattintása: csak szójelentés + kiejtés
+- kurzor szó fölött + `S`: szó mentése
+- `Esc`: szó-popup bezárása
